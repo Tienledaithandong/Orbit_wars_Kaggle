@@ -1,1 +1,40 @@
-(main_optimized.py is a source file, and there are no build artifacts, dependencies, or temporary files in the changes)
+```
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Dependencies
+venv/
+.venv/
+.env
+.env.local
+*.env.*
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Logs
+*.log
+
+# Checkpoints and weights
+weights/
+*.pt
+*.pth
+
+# Archives
+*.zip
+*.tar.gz
+*.tar
+*.gz
+
+# Temporary files
+*.tmp
+*.temp
+
+# Jupyter notebooks
+*.ipynb_checkpoints/
+```

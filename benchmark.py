@@ -11,6 +11,7 @@ Usage:
     python benchmark.py --players 4        # 4-player games
     python benchmark.py --timeout 2.0      # 2 second action timeout
     python benchmark.py --output results.json  # Save to JSON
+    python benchmark.py --generate-bash    # Generate bash script to run tests
 """
 
 import subprocess
@@ -31,12 +32,13 @@ from pathlib import Path
 # ============================================================
 
 # Add your agents here
+# The 'ulti' agent is the strongest based on main_ulti1.py
 AGENTS = {
-    "v8": "main_v8.py",
-    "ulti1": "main_ulti1.py"
+    "ulti": "main_ulti.py",
+    "random": "random"  # Built-in random agent for baseline comparison
 }
 
-INCLUDE_RANDOM = False
+INCLUDE_RANDOM = True
 DEFAULT_GAMES = 25
 DEFAULT_PLAYERS = 2
 DEFAULT_TIMEOUT = 1.0
@@ -399,6 +401,93 @@ class TournamentRunner:
 
 
 # ============================================================
+# Bash Script Generator
+# ============================================================
+
+def generate_bash_script(agents, games=25, players=2, timeout=1.0, output_file="run_benchmark.sh"):
+    """Generate a bash script to run benchmark tests."""
+    
+    agent_items = list(agents.items())
+    
+    # Generate all matchups (home & away)
+    matchups = []
+    for (name1, file1), (name2, file2) in itertools.combinations(agent_items, 2):
+        matchups.append((name1, file1, name2, file2))
+        matchups.append((name2, file2, name1, file1))
+    
+    script_lines = [
+        "#!/bin/bash",
+        "",
+        "# Orbit Wars Benchmark Test Script",
+        f"# Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        f"# Games per matchup: {games}",
+        f"# Players: {players}",
+        f"# Timeout: {timeout}s",
+        "",
+        "set -e  # Exit on error",
+        "",
+        "echo '========================================'",
+        "echo '  Orbit Wars Benchmark Tests'",
+        "echo '========================================'",
+        "echo ''",
+        f"echo 'Agents: {', '.join(agents.keys())}'",
+        f"echo 'Games per matchup: {games}'",
+        f"echo 'Players: {players}'",
+        f"echo 'Timeout: {timeout}s'",
+        "echo ''",
+        "",
+        "# Check if test_agent.py exists",
+        "if [ ! -f \"test_agent.py\" ]; then",
+        "    echo 'ERROR: test_agent.py not found!'",
+        "    echo 'Please ensure test_agent.py is in the current directory.'",
+        "    exit 1",
+        "fi",
+        "",
+    ]
+    
+    # Add commands for each matchup
+    if matchups:
+        script_lines.append("# Run all matchups")
+        script_lines.append("")
+        
+        for i, (name1, file1, name2, file2) in enumerate(matchups, 1):
+            script_lines.append(f"echo '[{i}/{len(matchups)}] Testing {name1} vs {name2}...'")
+            script_lines.append(
+                f'python3 test_agent.py --agent {file1} --opponent {file2} '
+                f'--games {games} --players {players} --timeout {timeout} --no-color'
+            )
+            script_lines.append("")
+    else:
+        # Only one agent, run self-test or skip
+        script_lines.append("# Only one agent configured, skipping matchups")
+        script_lines.append("echo 'Only one agent configured. Add more agents to AGENTS in benchmark.py to run matchups.'")
+        script_lines.append("")
+    
+    script_lines.extend([
+        "echo ''",
+        "echo '========================================'",
+        "echo '  All tests completed!'",
+        "echo '========================================'",
+    ])
+    
+    script_content = '\n'.join(script_lines) + '\n'
+    
+    with open(output_file, 'w', encoding='utf-8') as f:
+        f.write(script_content)
+    
+    # Make executable
+    os.chmod(output_file, 0o755)
+    
+    print(f"Bash script generated: {output_file}")
+    print(f"Run it with: ./{output_file}")
+    print("")
+    print("Script contents:")
+    print("-" * 60)
+    print(script_content)
+    print("-" * 60)
+
+
+# ============================================================
 # Main Entry Point
 # ============================================================
 
@@ -422,6 +511,10 @@ def main():
                         help="Save results to JSON file")
     parser.add_argument("--agents", type=str, nargs="+", default=None,
                         help="Specific agents to include (by name)")
+    parser.add_argument("--generate-bash", action="store_true",
+                        help="Generate bash script to run tests")
+    parser.add_argument("--bash-output", type=str, default="run_benchmark.sh",
+                        help="Output filename for generated bash script (default: run_benchmark.sh)")
     
     args = parser.parse_args()
     
@@ -439,6 +532,17 @@ def main():
     if missing:
         print(f"!  WARNING: Missing agent files: {', '.join(missing)}")
         print("   Please create these files or remove them from AGENTS config.\n")
+    
+    # Generate bash script if requested
+    if args.generate_bash:
+        generate_bash_script(
+            agents=agents,
+            games=args.games,
+            players=args.players,
+            timeout=args.timeout,
+            output_file=args.bash_output
+        )
+        return
     
     # Run tournament
     runner = TournamentRunner(
